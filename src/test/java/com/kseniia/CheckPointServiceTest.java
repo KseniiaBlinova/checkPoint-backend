@@ -1,35 +1,43 @@
 package com.kseniia;
 
+import com.kseniia.configuration.CheckPointConfiguration;
 import com.kseniia.exception.IncorrectParameterException;
 import com.kseniia.exception.NoEntryException;
 import com.kseniia.service.CheckPointService;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.*;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
-
-import static org.junit.Assert.*;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @RunWith(MockitoJUnitRunner.class)
 public class CheckPointServiceTest {
 
     @InjectMocks
-    private CheckPointService checkPointService = new CheckPointService();
+    private CheckPointService checkPointService;
 
     @Rule
     public ExpectedException expectedEx = ExpectedException.none();
 
-    @Test
-    public void testSuccessfulGoToRoom() {
-        assertTrue(checkPointService.checkPointByParameters(1, 1, true, false));
+    @Before
+    public void setUp(){
+        Map<Integer, Integer> map = new ConcurrentHashMap<>();
+        map.put(2,2);
+        map.put(3,3);
+        checkPointService = new CheckPointService(CheckPointConfiguration.Holder.INSTANCE, map);
     }
 
     @Test
-    public void testSuccessfulGetOutRoom() {
-        assertFalse(checkPointService.checkPointByParameters(1, 1, false, true));
+    public void testSuccessfulGoToRoom() {
+        checkPointService.checkPointByParameters(1, 1, true);
+    }
+
+    @Test
+    public void testSuccessfulGetOutRoom(){
+        this.checkPointService.checkPointByParameters(2, 2, false);
     }
 
     @Test
@@ -37,7 +45,7 @@ public class CheckPointServiceTest {
         expectedEx.expect(IncorrectParameterException.class);
         expectedEx.expectMessage("Incorrect keyId value");
 
-        checkPointService.checkPointByParameters(1, 1000000, true, false);
+        checkPointService.checkPointByParameters(1, 1000000, true);
     }
 
     @Test
@@ -45,7 +53,7 @@ public class CheckPointServiceTest {
         expectedEx.expect(IncorrectParameterException.class);
         expectedEx.expectMessage("Incorrect roomId value");
 
-        checkPointService.checkPointByParameters(10, 1, true, false);
+        checkPointService.checkPointByParameters(10, 1, true);
     }
 
     @Test
@@ -53,22 +61,22 @@ public class CheckPointServiceTest {
         expectedEx.expect(NoEntryException.class);
         expectedEx.expectMessage("No Entry");
 
-        checkPointService.checkPointByParameters(2, 5, true, false);
+        checkPointService.checkPointByParameters(2, 5, true);
     }
 
     @Test
     public void testUserAlreadyGoToRoom() {
         expectedEx.expect(NoEntryException.class);
-        expectedEx.expectMessage("user already go to the room");
+        expectedEx.expectMessage("No Entry");
 
-        checkPointService.checkPointByParameters(1, 1, true, true);
+        checkPointService.checkPointByParameters(3, 3, true);
     }
 
     @Test
     public void testUserAlreadyGetOutInRoom() {
         expectedEx.expect(NoEntryException.class);
-        expectedEx.expectMessage("user already get out the room");
+        expectedEx.expectMessage("No Entry");
 
-        checkPointService.checkPointByParameters(1, 1, false, false);
+        checkPointService.checkPointByParameters(1, 1, false);
     }
 }

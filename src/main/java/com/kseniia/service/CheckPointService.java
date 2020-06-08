@@ -1,22 +1,35 @@
 package com.kseniia.service;
 
+import com.kseniia.configuration.CheckPointConfiguration;
 import com.kseniia.exception.IncorrectParameterException;
 import com.kseniia.exception.NoEntryException;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+
+@AllArgsConstructor
+@NoArgsConstructor
 public class CheckPointService {
+
+    private CheckPointConfiguration checkPointConfiguration = CheckPointConfiguration.Holder.INSTANCE;
+    private Map<Integer, Integer> enteredRoomMap = new ConcurrentHashMap<>();
 
     private static final Logger log = LoggerFactory.getLogger("checkPointUtil");
 
-    public boolean checkPointByParameters(int roomId,
-                                          int keyId,
-                                          boolean entrance,
-                                          boolean entered) {
+    public void checkPointByParameters(int roomId,
+                                       int keyId,
+                                       boolean entrance) {
         try {
             checkKeyId(keyId);
             checkRoomId(roomId);
-            return isEnteredRoom(roomId, keyId, entrance, entered);
+            boolean enteredRoom = isEnteredRoom(roomId, keyId, entrance);
+            setEnteredRoom(enteredRoom, roomId, keyId);
+
         } catch (IncorrectParameterException e) {
             throw new IncorrectParameterException(e.getMessage());
         }
@@ -26,8 +39,9 @@ public class CheckPointService {
      * validation of the keyId value
      */
     private void checkKeyId(int keyId) {
-        if (keyId < 1 || keyId > 10000) {
-            log.error("Incorrect keyId value");
+        if (keyId < checkPointConfiguration.getMinKeyIdValue()
+                || keyId > checkPointConfiguration.getMaxKeyIdValue()) {
+            log.error("Incorrect keyId value = {}", keyId);
             throw new IncorrectParameterException("Incorrect keyId value");
         }
     }
@@ -36,8 +50,9 @@ public class CheckPointService {
      * validation of the roomId value
      */
     private void checkRoomId(int roomId) {
-        if (roomId < 1 || roomId > 5) {
-            log.error("Incorrect roomId value");
+        if (roomId < checkPointConfiguration.getMinRoomIdValue()
+                || roomId > checkPointConfiguration.getMaxRoomIdValue()) {
+            log.error("Incorrect roomId value = {}", roomId);
             throw new IncorrectParameterException("Incorrect roomId value");
         }
     }
@@ -47,27 +62,52 @@ public class CheckPointService {
      */
     private boolean isEnteredRoom(int roomId,
                                   int keyId,
-                                  boolean entrance,
-                                  boolean entered) {
+                                  boolean entrance) {
 
         if (keyId % roomId != 0) {
             log.error("try user = {} enter room = {} forbidden", keyId, roomId);
             throw new NoEntryException("No Entry");
         }
-        if (entrance == entered) {
-            if (entrance) {
-                log.error("user = {} enter room = {} already in room", keyId, roomId);
-                throw new NoEntryException("user already go to the room");
-            } else {
-                log.error("user = {} already get out the room = {}", keyId, roomId);
-                throw new NoEntryException("user already get out the room");
-            }
+
+        Integer enteredRoomByKeyId = enteredRoomMap.get(keyId);
+        if (entrance) {
+            enterRoom(roomId, enteredRoomByKeyId);
+        } else {
+            leaveRoom(roomId, enteredRoomByKeyId);
         }
+
         log.info("user = {} trying to {} the room = {}",
                 keyId,
                 entrance ? "get in" : "get out",
                 roomId);
 
         return entrance;
+    }
+
+    private void enterRoom(int roomId, Integer enteredRoom) {
+        if (Objects.nonNull(enteredRoom)) {
+            log.error("No Entry in room {}", roomId);
+            throw new NoEntryException("No Entry");
+        }
+    }
+
+    private void leaveRoom(int roomId, Integer enteredRoom) {
+        if (Objects.isNull(enteredRoom)) {
+            log.error("No Entry in room {}", roomId);
+            throw new NoEntryException("No Entry");
+        } else {
+            if (roomId != enteredRoom) {
+                log.error("No Entry in room {}", roomId);
+                throw new NoEntryException("No Entry");
+            }
+        }
+    }
+
+    private void setEnteredRoom(boolean entrance, int roomId, int keyId) {
+        if (entrance) {
+            enteredRoomMap.put(keyId, roomId);
+        } else {
+            enteredRoomMap.remove(keyId);
+        }
     }
 }
